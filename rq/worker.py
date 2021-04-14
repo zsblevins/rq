@@ -586,6 +586,7 @@ class Worker(object):
                         break
 
                     job, queue = result
+                    self.log.info('Popped %s from queue %s', job.id, queue.name)
                     self.reorder_queues(reference_queue=queue)
                     self.execute_job(job, queue)
                     self.heartbeat()
@@ -995,6 +996,7 @@ class Worker(object):
         """Performs the actual work of a job.  Will/should only be called
         inside the work horse's process.
         """
+        self.log.info('Performing job %s.', job.id)
         push_connection(self.connection)
 
         started_job_registry = queue.started_job_registry
@@ -1015,7 +1017,8 @@ class Worker(object):
             self.handle_job_success(job=job,
                                     queue=queue,
                                     started_job_registry=started_job_registry)
-        except:  # NOQA
+        except Exception:  # NOQA
+            self.log.exception('Error in perform job for %s', job.id)
             job.ended_at = utcnow()
             exc_info = sys.exc_info()
             exc_string = ''.join(traceback.format_exception(*exc_info))
@@ -1115,6 +1118,7 @@ class SimpleWorker(Worker):
 
     def execute_job(self, job, queue):
         """Execute job in same thread/process, do not fork()"""
+        self.log.info('Executing job %s with SimpleWorker', job.id)
         # "-1" means that jobs never timeout. In this case, we should _not_ do -1 + 60 = 59. We should just stick to DEFAULT_WORKER_TTL.
         if job.timeout == -1:
             timeout = DEFAULT_WORKER_TTL
