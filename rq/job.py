@@ -4,6 +4,7 @@ from __future__ import (absolute_import, division, print_function,
 
 import inspect
 import json
+import logging
 import pickle
 import warnings
 import zlib
@@ -41,6 +42,8 @@ JobStatus = enum(
 # Sentinel value to mark that some of our lazily evaluated properties have not
 # yet been evaluated.
 UNEVALUATED = object()
+
+logger = logging.getLogger(__name__)
 
 
 def truncate_long_string(data, maxlen=75):
@@ -353,7 +356,7 @@ class Job(object):
         self.ttl = None
         self.worker_name = None
         self._status = None
-        self._dependency_ids = []        
+        self._dependency_ids = []
         self.meta = {}
         self.serializer = resolve_serializer(serializer)
         self.retries_left = None
@@ -507,8 +510,8 @@ class Job(object):
 
         dep_ids = obj.get('dependency_ids')
         dep_id = obj.get('dependency_id')  # for backwards compatibility
-        self._dependency_ids = ( json.loads(dep_ids.decode()) if dep_ids
-                                else [dep_id.decode()] if dep_id else [] )
+        self._dependency_ids = (json.loads(dep_ids.decode()) if dep_ids
+                                else [dep_id.decode()] if dep_id else [])
 
         self.ttl = int(obj.get('ttl')) if obj.get('ttl') else None
         self.meta = self.serializer.loads(obj.get('meta')) if obj.get('meta') else {}
@@ -726,6 +729,7 @@ class Job(object):
             pipeline.hmset(self.key, mapping)
 
     def _execute(self):
+        logger.info('In job._execute for %s, executing %s', self.id, self.func_name)
         result = self.func(*self.args, **self.kwargs)
         if asyncio.iscoroutine(result):
             loop = asyncio.get_event_loop()
@@ -788,7 +792,7 @@ class Job(object):
         from .registry import FailedJobRegistry
         return FailedJobRegistry(self.origin, connection=self.connection,
                                  job_class=self.__class__)
-    
+
     def get_retry_interval(self):
         """Returns the desired retry interval.
         If number of retries is bigger than length of intervals, the first
@@ -866,6 +870,7 @@ class Job(object):
             if status
         )
 
+
 _job_stack = LocalStack()
 
 
@@ -875,7 +880,7 @@ class Retry(object):
         super().__init__()
         if max < 1:
             raise ValueError('max: please enter a value greater than 0')
-        
+
         if isinstance(interval, int):
             if interval < 0:
                 raise ValueError('interval: negative numbers are not allowed')
@@ -885,6 +890,6 @@ class Retry(object):
                 if i < 0:
                     raise ValueError('interval: negative numbers are not allowed')
             intervals = interval
-        
+
         self.max = max
         self.intervals = intervals
