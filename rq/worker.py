@@ -749,6 +749,7 @@ class Worker(object):
         """Spawns a work horse to perform the actual work and passes it a job.
         """
         child_pid = os.fork()
+        self.log.info('Forked child_pid %s for job_id %s', child_pid, job.id)
         os.environ['RQ_WORKER_ID'] = self.name
         os.environ['RQ_JOB_ID'] = job.id
         if child_pid == 0:
